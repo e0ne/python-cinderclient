@@ -437,12 +437,21 @@ class OpenStackCinderShell(object):
         module_path = os.path.dirname(os.path.abspath(__file__))
         version_str = "v%s" % version.replace('.', '_')
         ext_path = os.path.join(module_path, version_str, 'contrib')
-        ext_glob = os.path.join(ext_path, "*.py")
+        ext_glob = os.path.join(ext_path, "*")
 
         for ext_path in glob.iglob(ext_glob):
             name = os.path.basename(ext_path)[:-3]
+            if os.path.isdir(ext_path):
+                for ext_path2 in glob.iglob(os.path.join(ext_path, '*.py')):
+                    name2 = os.path.basename(ext_path2)[:-3]
+                    if name2 == "__init__":
+                        continue
+                    module2 = imp.load_source(name2, ext_path2)
+                    yield name2, module2
 
-            if name == "__init__":
+            name = os.path.basename(ext_path)[:-3]
+
+            if name == "__init__" or not ext_path.endswith('.py'):
                 continue
 
             module = imp.load_source(name, ext_path)
