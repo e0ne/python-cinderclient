@@ -406,6 +406,7 @@ class OpenStackCinderShell(object):
         self._find_actions(subparsers, self)
 
         for extension in self.extensions:
+#            import pdb; pdb.set_trace()
             self._find_actions(subparsers, extension.module)
 
         self._add_bash_completion_subparser(subparsers)
@@ -424,8 +425,12 @@ class OpenStackCinderShell(object):
         return extensions
 
     def _discover_via_python_path(self, version):
+        pkgs = list(pkgutil.iter_modules())
+        import pprint
+        pprint.pprint(pkgs)
         for (module_loader, name, ispkg) in pkgutil.iter_modules():
             if name.endswith('python_cinderclient_ext'):
+#                import pdb; pdb.set_trace()
                 if not hasattr(module_loader, 'load_module'):
                     # Python 2.6 compat: actually get an ImpImporter obj
                     module_loader = module_loader.find_module(name)
