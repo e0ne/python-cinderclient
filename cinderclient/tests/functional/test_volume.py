@@ -24,9 +24,7 @@ class CinderVolumeTests(object):
 
     def test_volume_create_delete_id(self):
         """Create and delete a volume by ID."""
-        import pdb;pdb.set_trace()
         volume = self.object_create('volume', 1)
-        import pdb;pdb.set_trace()
 #        self.assert_object_details(self.VOLUME_PROPERTY, volume.keys())
         self.object_delete('volume', volume)
         self.check_object_deleted('volume', volume)
