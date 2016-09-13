@@ -14,7 +14,7 @@
 from cinderclient.tests.functional import base
 
 
-class CinderClientReadOnlyTests(base.ClientTestBase):
+class CinderClientReadOnlyTests(base.ClientCLITestBase):
     """Basic read-only test for cinderclient.
 
     Simple check of base list commands, verify they

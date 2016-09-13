@@ -13,8 +13,10 @@
 import os
 import time
 
+from cinderclient import client
 import six
-from tempest.lib.cli import base
+from tempest.lib import base
+from tempest.lib.cli import base as base_cli
 from tempest.lib.cli import output_parser
 from tempest.lib import exceptions
 
@@ -37,6 +39,7 @@ def credentials():
     tenant_name = (os.environ.get('OS_TENANT_NAME')
                    or os.environ.get('OS_PROJECT_NAME'))
     auth_url = os.environ.get('OS_AUTH_URL')
+    volume_api_version = os.environ.get('OS_VOLUME_API_VERSION')
 
     config = six.moves.configparser.RawConfigParser()
     if config.read(_CREDS_FILE):
@@ -49,11 +52,12 @@ def credentials():
         'username': username,
         'password': password,
         'tenant_name': tenant_name,
-        'uri': auth_url
+        'uri': auth_url,
+        'vol_api_version': volume_api_version
     }
 
 
-class ClientTestBase(base.ClientTestBase):
+class ClientCLITestBase(base_cli.ClientTestBase):
     """Cinder base class, issues calls to cinderclient.
 
     """
@@ -67,7 +71,7 @@ class ClientTestBase(base.ClientTestBase):
             'OS_CINDERCLIENT_EXEC_DIR',
             os.path.join(os.path.abspath('.'), '.tox/functional/bin'))
 
-        return base.CLIClient(cli_dir=cli_dir, **credentials())
+        return base_cli.CLIClient(cli_dir=cli_dir, **credentials())
 
     def cinder(self, *args, **kwargs):
         return self.clients.cinder(*args,
@@ -182,3 +186,61 @@ class ClientTestBase(base.ClientTestBase):
         cmd_delete = self.object_cmd(object_name, 'delete')
         if object_id in self.cinder(cmd):
             self.cinder(cmd_delete, params=object_id)
+
+
+class ClientAPITestBase(base.BaseTestCase):
+    def setUp(self):
+        super(ClientAPITestBase, self).setUp()
+        creds = credentials()
+        self._client = client.Client(creds['vol_api_version'],
+                                     creds['username'],
+                                     creds['password'],
+                                     creds['tenant_name'],
+                                     creds['uri'])
+
+    def cinder(self, *args, **kwargs):
+        return self._client(*args, **kwargs)
+
+    def wait_for_object_status(self, object_name, object_id, status,
+                               timeout=60):
+        """Wait until object reaches given status.
+
+        :param object_name: object name
+        :param object_id: uuid4 id of an object
+        :param status: expected status of an object
+        :param timeout: timeout in seconds
+        """
+        manager = getattr(self._client, object_name)
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            obj = manager.get(object_id)
+            if obj['status'] == status:
+                break
+        else:
+            self.fail("%s %s did not reach status %s after %d seconds."
+                      % (object_name, object_id, status, timeout))
+
+    def object_create(self, object_name, params):
+        """Create an object.
+
+        :param object_name: object name
+        :param params: parameters to cinder command
+        :return: object dictionary
+        """
+        manager = getattr(self._client, object_name)
+        obj = manager.create(**params)
+        self.addCleanup(self.object_delete, object_name, obj['id'])
+        self.wait_for_object_status(object_name, obj['id'], 'available')
+        return obj
+
+    def object_delete(self, object_name, object_id):
+        """Delete specified object by ID.
+
+        :param object_name: object name
+        :param object_id: uuid4 id of an object
+        """
+        manager = getattr(self._client, object_name)
+        manager.delete(object_id)
+        # cmd_delete = self.object_cmd(object_name, 'delete')
+        # if object_id in self.cinder(cmd):
+        #     self.cinder(cmd_delete, params=object_id)

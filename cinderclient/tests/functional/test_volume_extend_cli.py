@@ -19,7 +19,7 @@ from cinderclient.tests.functional import base
 
 
 @ddt.ddt
-class CinderVolumeExtendNegativeTests(base.ClientTestBase):
+class CinderVolumeExtendNegativeTests(base.ClientCLITestBase):
     """Check of cinder volume extend command."""
 
     def setUp(self):
