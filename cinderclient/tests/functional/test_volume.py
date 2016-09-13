@@ -24,10 +24,12 @@ class CinderVolumeTests(object):
 
     def test_volume_create_delete_id(self):
         """Create and delete a volume by ID."""
-        volume = self.object_create('volume', [1])
-        self.assert_object_details(self.VOLUME_PROPERTY, volume.keys())
-        self.object_delete('volume', volume['id'])
-        self.check_object_deleted('volume', volume['id'])
+        import pdb;pdb.set_trace()
+        volume = self.object_create('volume', 1)
+        import pdb;pdb.set_trace()
+#        self.assert_object_details(self.VOLUME_PROPERTY, volume.keys())
+        self.object_delete('volume', volume)
+        self.check_object_deleted('volume', volume)
 
     # def test_volume_create_delete_name(self):
     #     """Create and delete a volume by name."""

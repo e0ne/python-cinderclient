@@ -14,6 +14,7 @@ import os
 import time
 
 from cinderclient import client
+from cinderclient import exceptions as cinder_exceptions
 import six
 from tempest.lib import base
 from tempest.lib.cli import base as base_cli
@@ -62,7 +63,7 @@ class ClientCLITestBase(base_cli.ClientTestBase):
 
     """
     def setUp(self):
-        super(ClientCLITestBasef, self).setUp()
+        super(ClientCLITestBase, self).setUp()
         self.clients = self._get_clients()
         self.parser = output_parser
 
@@ -143,7 +144,7 @@ class ClientCLITestBase(base_cli.ClientTestBase):
             self.fail("%s %s did not reach status %s after %d seconds."
                       % (object_name, object_id, status, timeout))
 
-    def check_object_deleted(self, object_name, object_id, timeout=60):
+    def check_object_deleted(self, object_name, obj, timeout=60):
         """Check that object deleted successfully.
 
         :param object_name: object name
@@ -154,7 +155,7 @@ class ClientCLITestBase(base_cli.ClientTestBase):
         try:
             start_time = time.time()
             while time.time() - start_time < timeout:
-                if object_id not in self.cinder(cmd, params=object_id):
+                if obj['id'] not in self.cinder(cmd, params=obj['id']):
                     break
         except exceptions.CommandFailed:
             pass
@@ -169,17 +170,17 @@ class ClientCLITestBase(base_cli.ClientTestBase):
         :param params: parameters to cinder command
         :return: object dictionary
         """
-        required = ' '.join(args)
+        required = ' '.join(map(lambda i: str(i), args))
         optional = ' '.join(map(lambda i: '--{0} {1}'.format(i[0],i[1]), kwargs.items()))
-        params = ' '.join(required, optional)
+        params = ' '.join([required, optional])
         cmd = self.object_cmd(object_name, 'create')
         output = self.cinder(cmd, params=params)
-        object = self._get_property_from_output(output)
-        self.addCleanup(self.object_delete, object_name, object['id'])
-        self.wait_for_object_status(object_name, object['id'], 'available')
-        return object
+        obj = self._get_property_from_output(output)
+        self.addCleanup(self.object_delete, object_name, obj)
+        self.wait_for_object_status(object_name, obj['id'], 'available')
+        return obj
 
-    def object_delete(self, object_name, object_id):
+    def object_delete(self, object_name, obj):
         """Delete specified object by ID.
 
         :param object_name: object name
@@ -187,8 +188,9 @@ class ClientCLITestBase(base_cli.ClientTestBase):
         """
         cmd = self.object_cmd(object_name, 'list')
         cmd_delete = self.object_cmd(object_name, 'delete')
-        if object_id in self.cinder(cmd):
-            self.cinder(cmd_delete, params=object_id)
+        import pdb;pdb.set_trace()
+        if obj['id'] in self.cinder(cmd):
+            self.cinder(cmd_delete, params=obj['id'])
 
 
 class ClientAPITestBase(base.BaseTestCase):
@@ -213,37 +215,59 @@ class ClientAPITestBase(base.BaseTestCase):
         :param status: expected status of an object
         :param timeout: timeout in seconds
         """
-        manager = getattr(self._client, object_name)
+        manager = getattr(self._client, object_name+'s')
         start_time = time.time()
         while time.time() - start_time < timeout:
             obj = manager.get(object_id)
-            if obj['status'] == status:
+            if obj.status == status:
                 break
         else:
             self.fail("%s %s did not reach status %s after %d seconds."
                       % (object_name, object_id, status, timeout))
 
-    def object_create(self, object_name, *args, ** kwargs):
+    def check_object_deleted(self, object_name, obj, timeout=60):
+        """Check that object deleted successfully.
+
+        :param object_name: object name
+        :param object_id: uuid4 id of an object
+        :param timeout: timeout in seconds
+        """
+        manager = getattr(self._client, object_name+'s')
+        try:
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                o = manager.get(obj.id)
+        except cinder_exceptions.NotFound:
+            pass
+        else:
+            self.fail("%s %s not deleted after %d seconds."
+                      % (object_name, obj.id, timeout))
+
+    def object_create(self, object_name, *args, **kwargs):
         """Create an object.
 
         :param object_name: object name
         :param params: parameters to cinder command
         :return: object dictionary
         """
-        manager = getattr(self._client, object_name)
+        manager = getattr(self._client, object_name+'s')
         obj = manager.create(*args, **kwargs)
-        self.addCleanup(self.object_delete, object_name, obj['id'])
-        self.wait_for_object_status(object_name, obj['id'], 'available')
+        self.addCleanup(self.object_delete, object_name, obj)
+        self.wait_for_object_status(object_name, obj.id, 'available')
         return obj
 
-    def object_delete(self, object_name, object_id):
+    def object_delete(self, object_name, obj):
         """Delete specified object by ID.
 
         :param object_name: object name
         :param object_id: uuid4 id of an object
         """
-        manager = getattr(self._client, object_name)
-        manager.delete(object_id)
+        manager = getattr(self._client, object_name+'s')
+        print(obj)
+        try:
+            manager.delete(obj)
+        except cinder_exceptions.NotFound:
+            pass
         # cmd_delete = self.object_cmd(object_name, 'delete')
         # if object_id in self.cinder(cmd):
         #     self.cinder(cmd_delete, params=object_id)
