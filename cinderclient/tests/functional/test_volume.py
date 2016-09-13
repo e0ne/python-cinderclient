@@ -14,7 +14,7 @@
 from cinderclient.tests.functional import base
 
 
-class CinderVolumeCLITests(base.ClientCLITestBase):
+class CinderVolumeTests(object):
     """Check of base cinder volume commands."""
 
     VOLUME_PROPERTY = ('attachments', 'availability_zone', 'bootable',
@@ -62,7 +62,10 @@ class CinderVolumeCLITests(base.ClientCLITestBase):
     #     self.check_object_deleted('volume', volume['id'])
 
 
-class CinderVolumeAPITests(base.ClientAPITestBase):
+class CinderVolumeCLITests(base.ClientCLITestBase, CinderVolumeTests):
+    pass
+
+class CinderVolumeAPITests(base.ClientAPITestBase, CinderVolumeTests):
     pass
 
 # class CinderSnapshotTests(base.ClientCLITestBase):
