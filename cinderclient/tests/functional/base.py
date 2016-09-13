@@ -62,7 +62,7 @@ class ClientCLITestBase(base_cli.ClientTestBase):
 
     """
     def setUp(self):
-        super(ClientCLITestBase, self).setUp()
+        super(ClientCLITestBasef, self).setUp()
         self.clients = self._get_clients()
         self.parser = output_parser
 
@@ -162,13 +162,16 @@ class ClientCLITestBase(base_cli.ClientTestBase):
             self.fail("%s %s not deleted after %d seconds."
                       % (object_name, object_id, timeout))
 
-    def object_create(self, object_name, params):
+    def object_create(self, object_name, *args, **kwargs):
         """Create an object.
 
         :param object_name: object name
         :param params: parameters to cinder command
         :return: object dictionary
         """
+        required = ' '.join(args)
+        optional = ' '.join(map(lambda i: '--{0} {1}'.format(i[0],i[1]), kwargs.items()))
+        params = ' '.join(required, optional)
         cmd = self.object_cmd(object_name, 'create')
         output = self.cinder(cmd, params=params)
         object = self._get_property_from_output(output)
@@ -220,7 +223,7 @@ class ClientAPITestBase(base.BaseTestCase):
             self.fail("%s %s did not reach status %s after %d seconds."
                       % (object_name, object_id, status, timeout))
 
-    def object_create(self, object_name, params):
+    def object_create(self, object_name, *args, ** kwargs):
         """Create an object.
 
         :param object_name: object name
@@ -228,7 +231,7 @@ class ClientAPITestBase(base.BaseTestCase):
         :return: object dictionary
         """
         manager = getattr(self._client, object_name)
-        obj = manager.create(**params)
+        obj = manager.create(*args, **kwargs)
         self.addCleanup(self.object_delete, object_name, obj['id'])
         self.wait_for_object_status(object_name, obj['id'], 'available')
         return obj
