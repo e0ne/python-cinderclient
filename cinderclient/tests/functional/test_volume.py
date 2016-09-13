@@ -29,37 +29,37 @@ class CinderVolumeTests(base.ClientCLITestBase):
         self.object_delete('volume', volume['id'])
         self.check_object_deleted('volume', volume['id'])
 
-    def test_volume_create_delete_name(self):
-        """Create and delete a volume by name."""
-        volume = self.object_create('volume',
-                                    params='1 --name TestVolumeNamedCreate')
+    # def test_volume_create_delete_name(self):
+    #     """Create and delete a volume by name."""
+    #     volume = self.object_create('volume',
+    #                                 params='1 --name TestVolumeNamedCreate')
 
-        self.cinder('delete', params='TestVolumeNamedCreate')
-        self.check_object_deleted('volume', volume['id'])
+    #     self.cinder('delete', params='TestVolumeNamedCreate')
+    #     self.check_object_deleted('volume', volume['id'])
 
-    def test_volume_show(self):
-        """Show volume details."""
-        volume = self.object_create('volume', params='1 --name TestVolumeShow')
-        output = self.cinder('show', params='TestVolumeShow')
-        volume = self._get_property_from_output(output)
-        self.assertEqual('TestVolumeShow', volume['name'])
-        self.assert_object_details(self.VOLUME_PROPERTY, volume.keys())
+    # def test_volume_show(self):
+    #     """Show volume details."""
+    #     volume = self.object_create('volume', params='1 --name TestVolumeShow')
+    #     output = self.cinder('show', params='TestVolumeShow')
+    #     volume = self._get_property_from_output(output)
+    #     self.assertEqual('TestVolumeShow', volume['name'])
+    #     self.assert_object_details(self.VOLUME_PROPERTY, volume.keys())
 
-        self.object_delete('volume', volume['id'])
-        self.check_object_deleted('volume', volume['id'])
+    #     self.object_delete('volume', volume['id'])
+    #     self.check_object_deleted('volume', volume['id'])
 
-    def test_volume_extend(self):
-        """Extend a volume size."""
-        volume = self.object_create('volume',
-                                    params='1 --name TestVolumeExtend')
-        self.cinder('extend', params="%s %s" % (volume['id'], 2))
-        self.wait_for_object_status('volume', volume['id'], 'available')
-        output = self.cinder('show', params=volume['id'])
-        volume = self._get_property_from_output(output)
-        self.assertEqual('2', volume['size'])
+    # def test_volume_extend(self):
+    #     """Extend a volume size."""
+    #     volume = self.object_create('volume',
+    #                                 params='1 --name TestVolumeExtend')
+    #     self.cinder('extend', params="%s %s" % (volume['id'], 2))
+    #     self.wait_for_object_status('volume', volume['id'], 'available')
+    #     output = self.cinder('show', params=volume['id'])
+    #     volume = self._get_property_from_output(output)
+    #     self.assertEqual('2', volume['size'])
 
-        self.object_delete('volume', volume['id'])
-        self.check_object_deleted('volume', volume['id'])
+    #     self.object_delete('volume', volume['id'])
+    #     self.check_object_deleted('volume', volume['id'])
 
 
 class CinderVolumeTests2(base.ClientAPITestBase):

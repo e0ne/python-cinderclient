@@ -62,7 +62,7 @@ class ClientCLITestBase(base_cli.ClientTestBase):
 
     """
     def setUp(self):
-        super(ClientTestBase, self).setUp()
+        super(ClientCLITestBase, self).setUp()
         self.clients = self._get_clients()
         self.parser = output_parser
 
