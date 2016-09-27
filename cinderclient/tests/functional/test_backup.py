@@ -13,8 +13,9 @@
 
 from cinderclient.tests.functional import base
 
+
 class CinderBackupTests(object):
-     """Check of base cinder backup commands."""
+    """Check of base cinder backup commands."""
 
     BACKUP_PROPERTY = ('id', 'name', 'volume_id')
 
@@ -27,8 +28,10 @@ class CinderBackupTests(object):
         self.object_delete('volume', volume)
         self.object_delete('backup', backup)
 
+
 class CinderBackupCLITests(base.ClientCLITestBase, CinderBackupTests):
     pass
+
 
 class CinderBackupAPITests(base.ClientAPITestBase, CinderBackupTests):
     pass
