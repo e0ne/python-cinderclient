@@ -126,7 +126,7 @@ class ClientCLITestBase(base_cli.ClientTestBase):
     def object_cmd(self, object_name, cmd):
         return (object_name + '-' + cmd if object_name != 'volume' else cmd)
 
-    def wait_for_object_status(self, object_name, object_id, status,
+    def wait_for_object_status(self, object_name, obj, status,
                                timeout=60):
         """Wait until object reaches given status.
 
@@ -138,7 +138,7 @@ class ClientCLITestBase(base_cli.ClientTestBase):
         cmd = self.object_cmd(object_name, 'show')
         start_time = time.time()
         while time.time() - start_time < timeout:
-            if status in self.cinder(cmd, params=object_id):
+            if status in self.cinder(cmd, params=obj['id']):
                 break
         else:
             self.fail("%s %s did not reach status %s after %d seconds."
@@ -177,7 +177,7 @@ class ClientCLITestBase(base_cli.ClientTestBase):
         output = self.cinder(cmd, params=params)
         obj = self._get_property_from_output(output)
         self.addCleanup(self.object_delete, object_name, obj)
-        self.wait_for_object_status(object_name, obj['id'], 'available')
+        self.wait_for_object_status(object_name, obj, 'available')
         return obj
 
     def object_delete(self, object_name, obj):
@@ -188,9 +188,21 @@ class ClientCLITestBase(base_cli.ClientTestBase):
         """
         cmd = self.object_cmd(object_name, 'list')
         cmd_delete = self.object_cmd(object_name, 'delete')
-        import pdb;pdb.set_trace()
+#        import pdb;pdb.set_trace()
         if obj['id'] in self.cinder(cmd):
             self.cinder(cmd_delete, params=obj['id'])
+        self.check_object_deleted(object_name, obj)
+
+    def assertPropertyEquals(self, obj, prop, value):
+        output = self.cinder('show', params=obj['id'])
+        volume = self._get_property_from_output(output)
+        self.assertEqual(six.text_type(value), volume[prop]) 
+
+    def volume_extend(self, volume, new_size):
+        self.cinder('extend', params="%s %s" % (volume['id'], new_size))
+
+    def get_object_id(self, obj):
+        return obj['id']
 
 
 class ClientAPITestBase(base.BaseTestCase):
@@ -206,7 +218,13 @@ class ClientAPITestBase(base.BaseTestCase):
     def cinder(self, *args, **kwargs):
         return self._client(*args, **kwargs)
 
-    def wait_for_object_status(self, object_name, object_id, status,
+    def _get_manager(self, resource_name):
+        mapper = {'volume': 'volumes',
+                  'snapshot': 'volume_snapshots',
+                  'backup': 'backups'}
+        return getattr(self._client, mapper[resource_name])
+
+    def wait_for_object_status(self, object_name, obj, status,
                                timeout=60):
         """Wait until object reaches given status.
 
@@ -215,15 +233,15 @@ class ClientAPITestBase(base.BaseTestCase):
         :param status: expected status of an object
         :param timeout: timeout in seconds
         """
-        manager = getattr(self._client, object_name+'s')
+        manager = self._get_manager(object_name)
         start_time = time.time()
         while time.time() - start_time < timeout:
-            obj = manager.get(object_id)
+            obj = manager.get(obj.id)
             if obj.status == status:
                 break
         else:
             self.fail("%s %s did not reach status %s after %d seconds."
-                      % (object_name, object_id, status, timeout))
+                      % (object_name, obj.id, status, timeout))
 
     def check_object_deleted(self, object_name, obj, timeout=60):
         """Check that object deleted successfully.
@@ -232,7 +250,7 @@ class ClientAPITestBase(base.BaseTestCase):
         :param object_id: uuid4 id of an object
         :param timeout: timeout in seconds
         """
-        manager = getattr(self._client, object_name+'s')
+        manager = self._get_manager(object_name)
         try:
             start_time = time.time()
             while time.time() - start_time < timeout:
@@ -250,10 +268,10 @@ class ClientAPITestBase(base.BaseTestCase):
         :param params: parameters to cinder command
         :return: object dictionary
         """
-        manager = getattr(self._client, object_name+'s')
+        manager = self._get_manager(object_name)
         obj = manager.create(*args, **kwargs)
         self.addCleanup(self.object_delete, object_name, obj)
-        self.wait_for_object_status(object_name, obj.id, 'available')
+        self.wait_for_object_status(object_name, obj, 'available')
         return obj
 
     def object_delete(self, object_name, obj):
@@ -262,12 +280,42 @@ class ClientAPITestBase(base.BaseTestCase):
         :param object_name: object name
         :param object_id: uuid4 id of an object
         """
-        manager = getattr(self._client, object_name+'s')
+        manager = self._get_manager(object_name)
         print(obj)
+        from cinderclient import utils
+        import six
+#        import pdb;pdb.set_trace()
+        if isinstance(obj, six.string_types):
+            o = utils.find_resource(manager, obj)
+        else:
+            o = obj
         try:
-            manager.delete(obj)
+            manager.delete(o)
         except cinder_exceptions.NotFound:
             pass
         # cmd_delete = self.object_cmd(object_name, 'delete')
         # if object_id in self.cinder(cmd):
         #     self.cinder(cmd_delete, params=object_id)
+        self.check_object_deleted(object_name, obj)
+
+    def assertPropertyEquals(self, obj, prop, value):
+        manager = self._get_manager('volume')
+        volume = manager.get(obj.id)
+        self.assertEqual(value, getattr(volume,prop))
+
+    def assert_object_details(self, expected, items):
+        """Check presence of common object properties.
+
+        :param expected: expected object properties
+        :param items: object properties
+        """
+        for value in expected:
+            attr = getattr(items, value)
+            self.assertTrue(hasattr(items, value))
+
+    def volume_extend(self, volume, new_size):
+        manager = self._get_manager('volume')
+        manager.extend(volume, new_size)
+
+    def get_object_id(self, obj):
+        return obj.id
