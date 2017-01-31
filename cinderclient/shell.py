@@ -229,8 +229,8 @@ class OpenStackCinderShell(object):
         self._append_global_identity_args(parser)
 
         # The auth-system-plugins might require some extra options
-        cinderclient.auth_plugin.discover_auth_systems()
-        cinderclient.auth_plugin.load_auth_system_opts(parser)
+#        cinderclient.auth_plugin.discover_auth_systems()
+#        cinderclient.auth_plugin.load_auth_system_opts(parser)
 
         return parser
 
@@ -619,8 +619,16 @@ class OpenStackCinderShell(object):
              args.volume_service_name,
              args.bypass_url, args.os_cacert,
              args.os_auth_system)
+        auth_session = None
         if os_auth_system and os_auth_system != "keystone":
-            auth_plugin = cinderclient.auth_plugin.load_plugin(os_auth_system)
+#            auth_plugin = cinderclient.auth_plugin.load_plugin(os_auth_system)
+            import pdb;pdb.set_trace()
+#            auth_plugin = loading.load_auth_from_argparse_arguments(
+#                self.options)
+            auth_plugin = loading.register_auth_argparse_arguments(
+                 parser=parser, argv=sys.argv, default="cinder-basic")
+            auth_session = loading.load_session_from_argparse_arguments(
+                self.options, auth=auth_plugin)
         else:
             auth_plugin = None
 
@@ -639,14 +647,14 @@ class OpenStackCinderShell(object):
                                  self.options.os_project_id)
 
         if not utils.isunauthenticated(args.func):
-            if auth_plugin:
-                auth_plugin.parse_opts(args)
+#            if auth_plugin:
+#                auth_plugin.parse_opts(args)
 
-            if not auth_plugin or not auth_plugin.opts:
-                if not os_username:
-                    raise exc.CommandError("You must provide a user name "
-                                           "through --os-username or "
-                                           "env[OS_USERNAME].")
+#            if not auth_plugin or not auth_plugin.opts:
+#                if not os_username:
+#                    raise exc.CommandError("You must provide a user name "
+#                                           "through --os-username or "
+#                                           "env[OS_USERNAME].")
 
             if not os_password:
                 # No password, If we've got a tty, try prompting for it
@@ -684,6 +692,7 @@ class OpenStackCinderShell(object):
 
             if not os_auth_url:
                 if os_auth_system and os_auth_system != 'keystone':
+                    import pdb;pdb.set_trace()
                     os_auth_url = auth_plugin.get_auth_url()
 
             if not os_auth_url:
@@ -711,8 +720,8 @@ class OpenStackCinderShell(object):
                 "You must provide an authentication URL "
                 "through --os-auth-url or env[OS_AUTH_URL].")
 
-        auth_session = None
-        if not auth_plugin:
+#        auth_session = None
+        if not auth_session: #auth_plugin:
             auth_session = self._get_keystone_session()
 
         insecure = self.options.insecure
