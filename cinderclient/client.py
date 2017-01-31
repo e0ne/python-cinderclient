@@ -368,7 +368,11 @@ class HTTPClient(object):
             attempts += 1
             if not self.management_url or not self.auth_token:
                 self.authenticate()
-            kwargs.setdefault('headers', {})['X-Auth-Token'] = self.auth_token
+            if not self.management_url.endswith(self.tenant_id):
+                m_url = ''.join([self.management_url, '/', self.tenant_id])
+                self.management_url = m_url
+            # TODO (e0ne): get auth token from auth plugin
+            kwargs.setdefault('headers', {})['X-Auth-Token'] = '%s:%s' % ('self.userid', self.tenant_id)
             if self.projectid:
                 kwargs['headers']['X-Auth-Project-Id'] = self.projectid
             try:
@@ -529,11 +533,8 @@ class HTTPClient(object):
 
         auth_url = self.auth_url
         if self.version == "v2.0" or self.version == "v3":
-            while auth_url:
-                if not self.auth_system or self.auth_system == 'keystone':
-                    auth_url = self._v2_or_v3_auth(auth_url)
-                else:
-                    auth_url = self._plugin_auth(auth_url)
+            if not self.auth_system or self.auth_system == 'keystone':
+                auth_url = self._v2_or_v3_auth(auth_url)
 
             # Are we acting on behalf of another user via an
             # existing token? If so, our actual endpoints may
@@ -559,11 +560,6 @@ class HTTPClient(object):
                     auth_url = auth_url + '/v2.0'
                 self._v2_or_v3_auth(auth_url)
 
-        if self.bypass_url:
-            self.set_management_url(self.bypass_url)
-        elif not self.management_url:
-            raise exceptions.Unauthorized('Cinder Client')
-
     def _v1_auth(self, url):
         if self.proxy_token:
             raise exceptions.NoTokenLookupException()
@@ -586,9 +582,6 @@ class HTTPClient(object):
             return resp.headers['location']
         else:
             raise exceptions.from_response(resp, body)
-
-    def _plugin_auth(self, auth_url):
-        return self.auth_plugin.authenticate(self, auth_url)
 
     def _v2_or_v3_auth(self, url):
         """Authenticate against a v2.0 auth service."""

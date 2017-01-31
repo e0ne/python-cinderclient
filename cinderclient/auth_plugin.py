@@ -15,8 +15,10 @@
 #    under the License.
 
 import logging
-import pkg_resources
+import os
+import pkgutil
 
+import cinderclient.contrib
 from cinderclient import exceptions
 from cinderclient import utils
 
@@ -27,21 +29,22 @@ logger = logging.getLogger(__name__)
 _discovered_plugins = {}
 
 
+# TODO(e0ne): remove this module!!!!
+
 def discover_auth_systems():
     """Discover the available auth-systems.
 
     This won't take into account the old style auth-systems.
     """
-    ep_name = 'openstack.client.auth_plugin'
-    for ep in pkg_resources.iter_entry_points(ep_name):
-        try:
-            auth_plugin = ep.load()
-        except (ImportError, pkg_resources.UnknownExtra, AttributeError) as e:
-            logger.debug("ERROR: Cannot load auth plugin %s", ep.name)
-            logger.debug(e, exc_info=1)
-        else:
-            _discovered_plugins[ep.name] = auth_plugin
-
+    abspath = os.path.abspath(cinderclient.contrib.__file__)
+    contrib_path = [os.path.dirname(abspath)]
+    for (module_loader, name, ispkg) in pkgutil.iter_modules(contrib_path):
+        if name.endswith('auth'):
+            if not hasattr(module_loader, 'load_module'):
+                # Python 2.6 compat: actually get an ImpImporter obj
+                module_loader = module_loader.find_module(name)
+            module = module_loader.load_module(name)
+            _discovered_plugins[name] = getattr(module, 'manager_class')
 
 def load_auth_system_opts(parser):
     """Load options needed by the available auth-systems into a parser.
@@ -74,6 +77,8 @@ class BaseAuthPlugin(object):
     """
     def __init__(self):
         self.opts = {}
+        self.management_url = None
+        self.auth_token = None
 
     def get_auth_url(self):
         """Return the auth url for the plugin (if any)."""
@@ -139,3 +144,8 @@ class DeprecatedAuthPlugin(object):
 
     def parse_opts(self, args):
         return self.opts
+
+
+class NoAuthPlugin(BaseAuthPlugin):
+    def authenticate(self, cls, auth_url):
+        return True
