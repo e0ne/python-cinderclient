@@ -111,6 +111,7 @@ class SessionClient(adapter.LegacyJsonAdapter):
         # Note(tpatil): The standard call raises errors from
         # keystoneauth, here we need to raise the cinderclient errors.
         raise_exc = kwargs.pop('raise_exc', True)
+        import pdb;pdb.set_trace()
         resp, body = super(SessionClient, self).request(*args,
                                                         raise_exc=False,
                                                         **kwargs)
@@ -128,6 +129,10 @@ class SessionClient(adapter.LegacyJsonAdapter):
         # this function is mostly redundant but makes compatibility easier
         kwargs.setdefault('authenticated', True)
         attempts = 0
+        import pdb;pdb.set_trace()
+#        if not self.management_url.endswith(self.tenant_id):
+#            m_url = ''.join([self.management_url, '/', self.tenant_id])
+#            self.management_url = m_url
         while True:
             attempts += 1
             try:
@@ -167,7 +172,8 @@ class SessionClient(adapter.LegacyJsonAdapter):
         return version
 
     def authenticate(self, auth=None):
-        self.invalidate(auth)
+#        self.invalidate(auth)
+        import pdb;pdb.set_trace()
         return self.get_token(auth)
 
     @property
@@ -202,7 +208,7 @@ class HTTPClient(object):
                  proxy_tenant_id=None, proxy_token=None, region_name=None,
                  endpoint_type='publicURL', service_type=None,
                  service_name=None, volume_service_name=None,
-                 bypass_url=None, retries=None,
+                 os_endpoint=None, retries=None,
                  http_log_debug=False, cacert=None,
                  auth_system='keystone', auth_plugin=None, api_version=None,
                  logger=None, user_domain_name='Default',
@@ -228,11 +234,11 @@ class HTTPClient(object):
         self.service_type = service_type
         self.service_name = service_name
         self.volume_service_name = volume_service_name
-        self.bypass_url = bypass_url.rstrip('/') if bypass_url else bypass_url
+        self.os_endpoint = os_endpoint.rstrip('/') if os_endpoint else os_endpoint
         self.retries = int(retries or 0)
         self.http_log_debug = http_log_debug
 
-        self.management_url = self.bypass_url or None
+        self.management_url = self.os_endpoint or None
         self.auth_token = None
         self.proxy_token = proxy_token
         self.proxy_tenant_id = proxy_tenant_id
@@ -255,6 +261,8 @@ class HTTPClient(object):
 
     def _safe_header(self, name, value):
         if name in HTTPClient.SENSITIVE_HEADERS:
+            if not value:
+                import pdb;pdb.set_trace()
             encoded = value.encode('utf-8')
             hashed = hashlib.sha1(encoded)
             digested = hashed.hexdigest()
@@ -338,8 +346,13 @@ class HTTPClient(object):
         backoff = 1
         while True:
             attempts += 1
+            import pdb;pdb.set_trace()
             if not self.management_url or not self.auth_token:
                 self.authenticate()
+#            if not self.management_url.endswith(self.tenant_id):
+#                m_url = ''.join([self.management_url, '/', self.tenant_id])
+#                self.management_url = m_url
+#            kwargs.setdefault('headers', {})['X-Auth-Token'] = '%s:%s' % ('self.userid', self.tenant_id) #'self.auth_token'
             kwargs.setdefault('headers', {})['X-Auth-Token'] = self.auth_token
             if self.projectid:
                 kwargs['headers']['X-Auth-Project-Id'] = self.projectid
@@ -405,8 +418,8 @@ class HTTPClient(object):
         try:
             version = get_volume_api_from_url(self.management_url)
         except exceptions.UnsupportedVersion as e:
-            if self.management_url == self.bypass_url:
-                msg = (_("Invalid url was specified in --bypass-url or "
+            if self.management_url == self.os_endpoint:
+                msg = (_("Invalid url was specified in --os-endpoint or "
                          "environment variable CINDERCLIENT_BYPASS_URL.\n"
                          "%s") % six.text_type(e.message))
             else:
@@ -505,14 +518,15 @@ class HTTPClient(object):
                 if not self.auth_system or self.auth_system == 'keystone':
                     auth_url = self._v2_or_v3_auth(auth_url)
                 else:
+                    import pdb;pdb.set_trace()
                     auth_url = self._plugin_auth(auth_url)
 
             # Are we acting on behalf of another user via an
             # existing token? If so, our actual endpoints may
             # be different than that of the admin token.
             if self.proxy_token:
-                if self.bypass_url:
-                    self.set_management_url(self.bypass_url)
+                if self.os_endpoint:
+                    self.set_management_url(self.os_endpoint)
                 else:
                     self._fetch_endpoints_from_auth(admin_url)
                 # Since keystone no longer returns the user token
@@ -531,8 +545,8 @@ class HTTPClient(object):
                     auth_url = auth_url + '/v2.0'
                 self._v2_or_v3_auth(auth_url)
 
-        if self.bypass_url:
-            self.set_management_url(self.bypass_url)
+        if self.os_endpoint:
+            self.set_management_url(self.os_endpoint)
         elif not self.management_url:
             raise exceptions.Unauthorized('Cinder Client')
 
@@ -560,7 +574,10 @@ class HTTPClient(object):
             raise exceptions.from_response(resp, body)
 
     def _plugin_auth(self, auth_url):
-        return self.auth_plugin.authenticate(self, auth_url)
+#        retval = self.auth_plugin.authenticate(self, auth_url)
+        import pdb;pdb.set_trace()
+        self.auth_token = self.auth_plugin.auth_token
+#        return retval
 
     def _v2_or_v3_auth(self, url):
         """Authenticate against a v2.0 auth service."""
@@ -615,7 +632,7 @@ def _construct_http_client(username=None, password=None, project_id=None,
                            region_name=None, endpoint_type='publicURL',
                            service_type='volume',
                            service_name=None, volume_service_name=None,
-                           bypass_url=None, retries=None,
+                           os_endpoint=None, retries=None,
                            http_log_debug=False,
                            auth_system='keystone', auth_plugin=None,
                            cacert=None, tenant_id=None,
@@ -624,7 +641,8 @@ def _construct_http_client(username=None, password=None, project_id=None,
                            **kwargs):
 
     # Don't use sessions if third party plugin or bypass_url being used
-    if session and not auth_plugin and not bypass_url:
+    import pdb;pdb.set_trace()
+    if session: # and not auth_plugin and not bypass_url:
         kwargs.setdefault('user_agent', 'python-cinderclient')
         kwargs.setdefault('interface', endpoint_type)
         return SessionClient(session=session,
@@ -653,7 +671,7 @@ def _construct_http_client(username=None, password=None, project_id=None,
                           service_type=service_type,
                           service_name=service_name,
                           volume_service_name=volume_service_name,
-                          bypass_url=bypass_url,
+                          os_endpoint=os_endpoint,
                           retries=retries,
                           http_log_debug=http_log_debug,
                           cacert=cacert,

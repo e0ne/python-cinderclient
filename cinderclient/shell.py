@@ -144,7 +144,10 @@ class OpenStackCinderShell(object):
                             help=_('Defaults to env[OS_AUTH_SYSTEM].'))
         parser.add_argument('--os_auth_system',
                             help=argparse.SUPPRESS)
-
+        parser.add_argument('--os-auth-type',
+                            metavar='<auth-type>',
+                            default=utils.env('OS_AUTH_TYPE'),
+                            help=_('Defaults to env[OS_AUTH_TYPE].'))
         parser.add_argument('--service-type',
                             metavar='<service-type>',
                             help=_('Service type. '
@@ -201,12 +204,22 @@ class OpenStackCinderShell(object):
 
         parser.add_argument('--bypass-url',
                             metavar='<bypass-url>',
-                            dest='bypass_url',
+                            dest='os_endpoint',
+                            default=utils.env('CINDERCLIENT_BYPASS_URL'),
+                            help=_("DEPRECATED! Use os_endpoint. Use this API endpoint instead of the "
+                            "Service Catalog. Defaults to "
+                            "env[CINDERCLIENT_BYPASS_URL]."))
+        parser.add_argument('--bypass_url',
+                            help=argparse.SUPPRESS)
+
+        parser.add_argument('--os-endpoint',
+                            metavar='<os-endpoint>',
+                            dest='os_endpoint',
                             default=utils.env('CINDERCLIENT_BYPASS_URL'),
                             help=_("Use this API endpoint instead of the "
                             "Service Catalog. Defaults to "
                             "env[CINDERCLIENT_BYPASS_URL]."))
-        parser.add_argument('--bypass_url',
+        parser.add_argument('--os_endpoint',
                             help=argparse.SUPPRESS)
 
         parser.add_argument('--retries',
@@ -229,8 +242,8 @@ class OpenStackCinderShell(object):
         self._append_global_identity_args(parser)
 
         # The auth-system-plugins might require some extra options
-        cinderclient.auth_plugin.discover_auth_systems()
-        cinderclient.auth_plugin.load_auth_system_opts(parser)
+#        cinderclient.auth_plugin.discover_auth_systems()
+#        cinderclient.auth_plugin.load_auth_system_opts(parser)
 
         return parser
 
@@ -609,7 +622,7 @@ class OpenStackCinderShell(object):
 
         (os_username, os_password, os_tenant_name, os_auth_url,
          os_region_name, os_tenant_id, endpoint_type,
-         service_type, service_name, volume_service_name, bypass_url,
+         service_type, service_name, volume_service_name, os_endpoint,
          cacert, os_auth_system) = (
              args.os_username, args.os_password,
              args.os_tenant_name, args.os_auth_url,
@@ -617,10 +630,19 @@ class OpenStackCinderShell(object):
              args.os_endpoint_type,
              args.service_type, args.service_name,
              args.volume_service_name,
-             args.bypass_url, args.os_cacert,
+             args.os_endpoint, args.os_cacert,
              args.os_auth_system)
+        auth_session = None
+        
         if os_auth_system and os_auth_system != "keystone":
-            auth_plugin = cinderclient.auth_plugin.load_plugin(os_auth_system)
+#            auth_plugin = cinderclient.auth_plugin.load_plugin(os_auth_system)
+            import pdb;pdb.set_trace()
+            auth_plugin = loading.load_auth_from_argparse_arguments(
+                self.options)
+            #auth_plugin = loading.register_auth_argparse_arguments(
+            #     parser=parser, argv=sys.argv, default="cinder-basic")
+            auth_session = loading.load_session_from_argparse_arguments(
+                self.options, auth=auth_plugin)
         else:
             auth_plugin = None
 
@@ -639,14 +661,14 @@ class OpenStackCinderShell(object):
                                  self.options.os_project_id)
 
         if not utils.isunauthenticated(args.func):
-            if auth_plugin:
-                auth_plugin.parse_opts(args)
+#            if auth_plugin:
+#                auth_plugin.parse_opts(args)
 
-            if not auth_plugin or not auth_plugin.opts:
-                if not os_username:
-                    raise exc.CommandError("You must provide a user name "
-                                           "through --os-username or "
-                                           "env[OS_USERNAME].")
+#            if not auth_plugin or not auth_plugin.opts:
+#                if not os_username:
+#                    raise exc.CommandError("You must provide a user name "
+#                                           "through --os-username or "
+#                                           "env[OS_USERNAME].")
 
             if not os_password:
                 # No password, If we've got a tty, try prompting for it
@@ -684,6 +706,7 @@ class OpenStackCinderShell(object):
 
             if not os_auth_url:
                 if os_auth_system and os_auth_system != 'keystone':
+                    import pdb;pdb.set_trace()
                     os_auth_url = auth_plugin.get_auth_url()
 
             if not os_auth_url:
@@ -711,8 +734,8 @@ class OpenStackCinderShell(object):
                 "You must provide an authentication URL "
                 "through --os-auth-url or env[OS_AUTH_URL].")
 
-        auth_session = None
-        if not auth_plugin:
+#        auth_session = None
+        if not auth_session: #auth_plugin:
             auth_session = self._get_keystone_session()
 
         insecure = self.options.insecure
@@ -727,7 +750,7 @@ class OpenStackCinderShell(object):
             service_type=service_type,
             service_name=service_name,
             volume_service_name=volume_service_name,
-            bypass_url=bypass_url,
+            os_endpoint=os_endpoint,
             retries=options.retries,
             http_log_debug=args.debug,
             insecure=insecure,
@@ -750,6 +773,7 @@ class OpenStackCinderShell(object):
         # --os-volume-api-version or with the OS_VOLUME_API_VERSION environment
         # variable.  Fail safe is to use the default API setting.
         try:
+            import pdb;pdb.set_trace()
             endpoint_api_version = \
                 self.cs.get_volume_api_version_from_endpoint()
         except exc.UnsupportedVersion:
